@@ -11,6 +11,8 @@ class smoothingFilters():
         self.k = K
         self.image = image
         self.P = P
+        self.outputimage = None
+
     def trimmedMean(self,array):
         trimGrayscale = 1
         flattenarray = array.flatten()
@@ -104,38 +106,54 @@ class smoothingFilters():
                 outputbandCol.append(avgValue)
             outputband.append(outputbandCol)
         return np.array(outputband)
-    
+
+    def globalmeanstd(self,imagearray):
+        meanarray = [np.mean(array[~np.isnan(array)].flatten())  for array  in imagearray ]
+        stdarray = [np.std(array[~np.isnan(array)].flatten()) for array  in imagearray ]
+        print(meanarray,stdarray)
+        return  meanarray,stdarray
+
     def display(self,outputimage):
-#         plt.figure()
-#         plt.imshow(outputimage) 
-#         plt.show()
-        # final_image=cv2.merge((outputimage[2],outputimage[1],outputimage[0]))
-        # cv2.imwrite('outimage.jpg',final_image)
-        # cv2.imshow('Out Image', final_image)
-        outputimage = np.dstack((outputimage[1],outputimage[0],outputimage[2]))
-        st.image(outputimage, caption=f"Output image", use_column_width=True)
-        # cv2.imwrite(str('aniket1'+'.'+'jpg'),)
+        final_image=cv2.merge((outputimage[2],outputimage [1],outputimage[0]))
+        cv2.imwrite('outimage.jpg',final_image)
+        st.image('./outimage.jpg', caption=f"Output image", use_column_width=True)
+
     
     def trimmedSmoothing(self,algo=None):
         outputimage = []
         img = self.image
+        inputmean, inputstd = [],[]
         for bandNumber in range(img.shape[2]):
             bandarray = np.array([array[:,bandNumber] for array in img])
+            inputmean.append(np.mean(bandarray[~np.isnan(bandarray)].flatten()))
+            inputstd.append(np.std(bandarray[~np.isnan(bandarray)].flatten()))
             outputband = self.convolution(bandarray,algo) 
             outputimage.append(outputband)
         self.display(outputimage)
-        return outputimage  
+        mean, std = self.globalmeanstd(outputimage)
 
-    def inverseGradientSmoothing(self,algo = None): 
+        st.write(f"The input image global mean(RGB):{tuple(np.round(inputmean,2))} \n and global standard deviation(RGB):{tuple(np.round(inputstd,2))}")
+        st.write(f"The output image global mean(RGB):{tuple(np.round(mean,2))} \n  and global standard deviation(RGB):{tuple(np.round(mean,2))}")
+        
+        return None  
+
+    def inverseGradientSmoothing(self,algo = None):     
         outputimage = []
         img = self.image
+        inputmean, inputstd = [],[]
         for bandNumber in range(img.shape[2]):
             bandarray = np.array([array[:,bandNumber] for array in img])
+            inputmean.append(np.mean(bandarray[~np.isnan(bandarray)].flatten()))
+            inputstd.append(np.std(bandarray[~np.isnan(bandarray)].flatten()))
             outputband = self.convolution(bandarray,algo) 
             outputimage.append(outputband)
         self.display(outputimage)
-        return outputimage
+        mean, std = self.globalmeanstd(outputimage)
 
+        st.write(f"The input image global mean(RGB):{tuple(np.round(inputmean,2))} \n and global standard deviation(RGB):{tuple(np.round(inputstd,2))}")
+        st.write(f"The output image global mean(RGB):{tuple(np.round(mean,2))} \n and global standard deviation(RGB):{tuple(np.round(mean,2))}")
+        
+        return None  
 
 Algorithm = st.sidebar.selectbox('Which algorithm do you want to implement?', ["Select algorithm", 'Trimmed Mean Filter','Inverse Gradient Filter'])
 st.write("Image smoothing filter GUI")
