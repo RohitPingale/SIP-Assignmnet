@@ -1,14 +1,16 @@
 import streamlit as st
+
 import cv2
 from PIL import Image
+
 from io import BytesIO
 import numpy as np
 
-class smoothingFiltes():
-    def __init__(self,image,K = 3):
+class smoothingFilters():
+    def __init__(self,image,K = 3, P= None):
         self.k = K
         self.image = image
-    
+        self.P = P
     def trimmedMean(self,array):
         trimGrayscale = 1
         flattenarray = array.flatten()
@@ -98,7 +100,7 @@ class smoothingFiltes():
                 if algo == 'Trimmed Mean Filter':
                     avgValue = self.trimmedMean(neighbourhoodMatrix)
                 if algo == 'Inverse Gradient Filter':
-                    avgValue = self.inverseGradient(neighbourhoodMatrix)
+                    avgValue = self.inverseGradient(neighbourhoodMatrix,self.P)
                 outputbandCol.append(avgValue)
             outputband.append(outputbandCol)
         return np.array(outputband)
@@ -107,10 +109,11 @@ class smoothingFiltes():
 #         plt.figure()
 #         plt.imshow(outputimage) 
 #         plt.show()
-        final_image=cv2.merge((outputimage[2],outputimage[1],outputimage[0]))
-        cv2.imwrite('outimage.jpg',final_image)
-        cv2.imshow('Out Image', final_image)
-        st.image(final_image, caption=f"Output image", use_column_width=True)
+        # final_image=cv2.merge((outputimage[2],outputimage[1],outputimage[0]))
+        # cv2.imwrite('outimage.jpg',final_image)
+        # cv2.imshow('Out Image', final_image)
+        outputimage = np.dstack((outputimage[1],outputimage[0],outputimage[2]))
+        st.image(outputimage, caption=f"Output image", use_column_width=True)
         # cv2.imwrite(str('aniket1'+'.'+'jpg'),)
     
     def trimmedSmoothing(self,algo=None):
@@ -121,20 +124,20 @@ class smoothingFiltes():
             outputband = self.convolution(bandarray,algo) 
             outputimage.append(outputband)
         self.display(outputimage)
-        return outputimage
+        return outputimage  
 
-    def inverseGradientSmoothing(self,P,algo = None):
+    def inverseGradientSmoothing(self,algo = None): 
         outputimage = []
         img = self.image
         for bandNumber in range(img.shape[2]):
             bandarray = np.array([array[:,bandNumber] for array in img])
-            outputband = self.convolution(bandarray,P,algo) 
+            outputband = self.convolution(bandarray,algo) 
             outputimage.append(outputband)
         self.display(outputimage)
         return outputimage
 
 
-Algorithm = st.sidebar.selectbox('Which algorithm do you want to implement?', ['Trimmed Mean Filter','Inverse Gradient Filter'])
+Algorithm = st.sidebar.selectbox('Which algorithm do you want to implement?', ["Select algorithm", 'Trimmed Mean Filter','Inverse Gradient Filter'])
 st.write("Image smoothing filter GUI")
 
 inputimagefile = st.file_uploader('Upload the image',type = ['png','jpeg','jpg'])
@@ -149,14 +152,16 @@ if isinstance(inputimagefile,BytesIO):
     pil_image = Image.open(inputimagefile)
     img_array = np.array(pil_image)
 
+    if Algorithm == 'Select algorithm':
+            pass
 
     if Algorithm == 'Trimmed Mean Filter':
-            K_trim = st.sidebar.slider('Select size of convolution matrix: n x n',3, 9)
-            ourfilter = smoothingFiltes(img_array,K=K_trim)
+            K_trim = st.sidebar.slider('Select size of convolution matrix: n x n',3, 9, step=2)
+            ourfilter = smoothingFilters(img_array,K=K_trim)
             outputimage = ourfilter.trimmedSmoothing(algo = 'Trimmed Mean Filter' )
 
     if Algorithm == 'Inverse Gradient Filter':
-            K_inverse = st.sidebar.slider('Select size of convolution matrix: n x n ',3, 9,3)
-            P = st.sidebar.slider('Select weight assigned to center pixel (p)',0.0, 1.0,0.5)
-            ourfilter = smoothingFiltes(img_array,K=K_inverse)
-            outputimage = ourfilter.inverseGradientSmoothing(P,algo = 'Inverse Gradient Filter')
+            K_inverse = st.sidebar.slider('Select size of convolution matrix: n x n ',3, 9,step=2)
+            P = st.sidebar.slider('Select weight assigned to center pixel (p)',0.0, 1.0,value=0.5)
+            ourfilter = smoothingFilters(img_array,K=K_inverse, P = P)
+            outputimage = ourfilter.inverseGradientSmoothing(algo = 'Inverse Gradient Filter')
