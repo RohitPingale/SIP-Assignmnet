@@ -3,6 +3,7 @@ import streamlit as st
 import cv2
 from PIL import Image
 
+import time
 from io import BytesIO
 import numpy as np
 
@@ -94,9 +95,9 @@ class smoothingFilters():
         arrayshape = imageBand.shape
         outputband = []
 
-        for rowNo in range(arrayshape[0] - paddingValue):
+        for rowNo in range(arrayshape[0] - paddingValue*2):
             outputbandCol = []
-            for colNo in range(arrayshape[1] - paddingValue):
+            for colNo in range(arrayshape[1] - paddingValue*2):
                 neighbourhoodMatrix = imageBand[rowNo:rowNo + self.k,colNo:colNo + self.k]
 #                 print(neighbourhoodMatrix)
                 if algo == 'Trimmed Mean Filter':
@@ -108,13 +109,19 @@ class smoothingFilters():
         return np.array(outputband)
 
     def globalmeanstd(self,imagearray):
-        meanarray = [np.mean(array[~np.isnan(array)].flatten())  for array  in imagearray ]
-        stdarray = [np.std(array[~np.isnan(array)].flatten()) for array  in imagearray ]
+        meanarray = np.array([np.mean(array[~np.isnan(array)].flatten())  for array  in imagearray ])
+        stdarray = np.array([np.std(array[~np.isnan(array)].flatten()) for array  in imagearray ])
         print(meanarray,stdarray)
         return  meanarray,stdarray
 
     def display(self,outputimage):
-        final_image=cv2.merge((outputimage[2],outputimage [1],outputimage[0]))
+        lengtharray = len(outputimage)
+        bandsequence = [outputimage[lengtharray - i] for i in range(1,lengtharray+1)]
+        if lengtharray!=3:
+            emptyarray = np.zeros(bandsequence[0].shape)
+            for _ in range(3-lengtharray):
+                bandsequence.append(emptyarray)
+        final_image=cv2.merge(tuple(bandsequence))
         cv2.imwrite('outimage.jpg',final_image)
         st.image('./outimage.jpg', caption=f"Output image", use_column_width=True)
 
@@ -122,27 +129,37 @@ class smoothingFilters():
     def trimmedSmoothing(self,algo=None):
         outputimage = []
         img = self.image
+        if len(img.shape) != 3:
+            bands = 1
+        else:bands = img.shape[2]
         inputmean, inputstd = [],[]
-        for bandNumber in range(img.shape[2]):
-            bandarray = np.array([array[:,bandNumber] for array in img])
+        for bandNumber in range(bands):
+            if bands == 1:
+                bandarray = np.array(img)
+            else: bandarray = np.array([array[:,bandNumber] for array in img])
             inputmean.append(np.mean(bandarray[~np.isnan(bandarray)].flatten()))
             inputstd.append(np.std(bandarray[~np.isnan(bandarray)].flatten()))
             outputband = self.convolution(bandarray,algo) 
             outputimage.append(outputband)
         self.display(outputimage)
-        mean, std = self.globalmeanstd(outputimage)
+        mean, std = self.globalmeanstd(outputimage) 
 
-        st.write(f"The input image global mean(RGB):{tuple(np.round(inputmean,2))} \n and global standard deviation(RGB):{tuple(np.round(inputstd,2))}")
-        st.write(f"The output image global mean(RGB):{tuple(np.round(mean,2))} \n  and global standard deviation(RGB):{tuple(np.round(mean,2))}")
+        st.markdown(f"The **input image** global mean to standard deviation ratio(RGB):**{tuple(np.round(np.array(inputmean)/np.array(inputstd),2))}**")
+        st.markdown(f"The **output image** global mean to standard deviation ratio(RGB):**{tuple(np.round(np.array(mean)/np.array(std),2))}**")
         
         return None  
 
     def inverseGradientSmoothing(self,algo = None):     
         outputimage = []
         img = self.image
+        if len(img.shape) != 3:
+            bands = 1
+        else:bands = img.shape[2]
         inputmean, inputstd = [],[]
-        for bandNumber in range(img.shape[2]):
-            bandarray = np.array([array[:,bandNumber] for array in img])
+        for bandNumber in range(bands):
+            if bands == 1:
+                bandarray = np.array(img)
+            else: bandarray = np.array([array[:,bandNumber] for array in img])
             inputmean.append(np.mean(bandarray[~np.isnan(bandarray)].flatten()))
             inputstd.append(np.std(bandarray[~np.isnan(bandarray)].flatten()))
             outputband = self.convolution(bandarray,algo) 
@@ -150,36 +167,43 @@ class smoothingFilters():
         self.display(outputimage)
         mean, std = self.globalmeanstd(outputimage)
 
-        st.write(f"The input image global mean(RGB):{tuple(np.round(inputmean,2))} \n and global standard deviation(RGB):{tuple(np.round(inputstd,2))}")
-        st.write(f"The output image global mean(RGB):{tuple(np.round(mean,2))} \n and global standard deviation(RGB):{tuple(np.round(mean,2))}")
+        st.markdown(f"The **input image** global mean to standard deviation ratio(RGB):**{tuple(np.round(np.array(inputmean)/np.array(inputstd),2))}**")
+        st.markdown(f"The **output image** global mean to standard deviation ratio(RGB):**{tuple(np.round(np.array(mean)/np.array(std),2))}**")
         
         return None  
 
 Algorithm = st.sidebar.selectbox('Which algorithm do you want to implement?', ["Select algorithm", 'Trimmed Mean Filter','Inverse Gradient Filter'])
-st.write("Image smoothing filter GUI")
+st.markdown("# Trimmed mean & Inverse gradient filter GUI")
 
 inputimagefile = st.file_uploader('Upload the image',type = ['png','jpeg','jpg'])
 show_file = st.empty()
 
 if not inputimagefile:
     show_file.info('Please upload the image')
+
 if isinstance(inputimagefile,BytesIO):
     imagefile = inputimagefile.read()
     st.image(imagefile, caption=f"Input image", use_column_width=True)
     
     pil_image = Image.open(inputimagefile)
     img_array = np.array(pil_image)
-
+    print(img_array.shape)
     if Algorithm == 'Select algorithm':
             pass
 
     if Algorithm == 'Trimmed Mean Filter':
             K_trim = st.sidebar.slider('Select size of convolution matrix: n x n',3, 9, step=2)
+            start = time.time()
             ourfilter = smoothingFilters(img_array,K=K_trim)
             outputimage = ourfilter.trimmedSmoothing(algo = 'Trimmed Mean Filter' )
+            end = time.time()
+            st.markdown(f"**Total runtime: {round(end-start,2)} sec**")
 
     if Algorithm == 'Inverse Gradient Filter':
             K_inverse = st.sidebar.slider('Select size of convolution matrix: n x n ',3, 9,step=2)
             P = st.sidebar.slider('Select weight assigned to center pixel (p)',0.0, 1.0,value=0.5)
+            start = time.time()
             ourfilter = smoothingFilters(img_array,K=K_inverse, P = P)
             outputimage = ourfilter.inverseGradientSmoothing(algo = 'Inverse Gradient Filter')
+            end = time.time()
+            st.markdown(f"**Total runtime: {round(end-start,2)} sec**")
